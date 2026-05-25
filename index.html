@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<!-- Declaración estándar HTML5: le dice al navegador qué versión de HTML usar -->
+<!-- Elemento raíz del documento; lang="es" declara español para lectores de pantalla y SEO -->
+<html lang="es">
+<!-- Sección de metadatos: invisible en pantalla, define configuración, fuentes y hojas de estilo -->
+<head>
+<!--
+================================================================================
+  index.html  —  safeXP | Aprende Ciberseguridad
+================================================================================
+  Estructura HTML del proyecto. Contiene todas las pantallas, overlays y
+  paneles de la aplicación. Referencia:
+    • styles.css  →  todos los estilos visuales
+    • app.js      →  toda la lógica de la aplicación
+
+  ARQUITECTURA:
+  • #auth-screen      → pantalla de login/registro (visible al inicio)
+  • #topbar           → barra superior fija con stats y navegación
+  • .screen#home      → mapa de unidades (pantalla principal)
+  • .screen#lesson    → preguntas y respuestas
+  • .screen#result    → resumen de actividad completada
+  • .screen#minigame  → minijuego de recuperación de corazones
+  • #theory-panel     → drawer lateral de teoría (dentro de lesson)
+  • #msg-conversation → pantalla de chat directo
+  • #share-progress-modal → modal para compartir progreso
+  • Overlays: unit-detail, no-hearts, placement, daily, lesson-info,
+              fb-bar, mg-select, unlock-quiz, friend-drawer, a11y, dev
+================================================================================
+-->
+<!-- charset=UTF-8: soporta todos los caracteres (tildes, ñ, emojis) | viewport: adapta la escala en móvil -->
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- Título visible en la pestaña del navegador y en resultados de búsqueda -->
+<title>safeXP — Aprende Ciberseguridad</title>
+<!-- Carga la fuente Nunito (400-900 pesos) desde Google Fonts; display=swap evita texto invisible durante carga -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&display=swap" rel="stylesheet">
+<!-- Enlaza el archivo CSS externo con todos los estilos visuales del proyecto -->
+<link rel="stylesheet" href="styles.css">
+<!-- Cierra la sección de metadatos -->
+</head>
+<!-- Inicio del cuerpo visible: todo el contenido renderizado en pantalla va aquí -->
+<body>
+<a href="#main-content" id="skip-link">Saltar al contenido principal</a>
+<div id="a11y-live" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- ██████ AUTH SCREEN ██████ -->
+<!-- Pantalla de autenticación: cubre toda la ventana con position:fixed hasta que el usuario inicie sesión -->
+<div id="auth-screen">
+  <!-- decorative orbs -->
+  <!-- Orbe decorativo 1 — círculo morado borroso en esquina superior izquierda (decoración glassmorphism) -->
+  <div class="auth-bg-orb o1"></div>
+  <!-- Orbe decorativo 2 — círculo azul borroso en esquina inferior derecha -->
+  <div class="auth-bg-orb o2"></div>
+  <!-- Orbe decorativo 3 — círculo teal borroso en el centro derecho -->
+  <div class="auth-bg-orb o3"></div>
+
+  <!-- Tarjeta central glassmorphism: todo el formulario de auth; role=main para navegación por teclado/lector -->
+  <div class="auth-card" role="dialog" aria-modal="true" aria-label="Inicio de sesión y registro">
+
+    <!-- Logo -->
+    <!-- Contenedor del logo: agrupa ícono, nombre del producto y tagline -->
+    <div class="auth-logo">
+      <!-- Ícono 🛡️ del logo dentro de un cuadro con gradiente azul-morado -->
+      <div class="auth-logo-icon">🛡️</div>
+      <!-- Nombre "safeXP" con efecto de texto en gradiente azul-morado (webkit-background-clip) -->
+      <div class="auth-logo-name">safeXP</div>
+      <!-- Subtítulo descriptivo del producto debajo del nombre -->
+      <div class="auth-logo-tagline">Aprende ciberseguridad. Nivel a nivel.</div>
+    </div>
+
+    <!-- Tabs -->
+    <!-- Contenedor de pestañas login/registro; role=tablist para accesibilidad con lector de pantalla -->
+    <div class="auth-tabs" role="tablist">
+      <!-- Pestaña "Iniciar sesión": activa por defecto (clase active, aria-selected=true) -->
+      <button class="auth-tab active" id="tab-login-btn" role="tab" aria-selected="true" aria-controls="panel-login"
+        onclick="authSwitchTab('login')">Iniciar sesión</button>
+      <!-- Pestaña "Registrarse": inactiva al inicio, aria-selected=false -->
+      <button class="auth-tab" id="tab-register-btn" role="tab" aria-selected="false" aria-controls="panel-register"
+        onclick="authSwitchTab('register')">Registrarse</button>
+    </div>
+
+    <!-- Error / success banners -->
+    <!-- Banner de error rojo: oculto por defecto, aparece con clase .show cuando hay error de auth -->
+    <div class="auth-error-banner" id="auth-error-banner" role="alert">
+      <!-- Texto del error de auth: el JS escribe el mensaje específico aquí (ej: "Correo inválido") -->
+      <span>⚠️</span><span id="auth-error-text">Error desconocido</span>
+    </div>
+    <!-- Banner de éxito verde: aparece tras registro exitoso o acciones positivas -->
+    <div class="auth-success-banner" id="auth-success-banner" role="status">
+      <!-- Texto de confirmación: el JS escribe mensajes como "¡Cuenta creada! 🎉" aquí -->
+      <span>✅</span><span id="auth-success-text">¡Registro exitoso!</span>
+    </div>
+
+    <!-- ── LOGIN PANEL ── -->
+    <!-- Panel del formulario de LOGIN: visible por defecto (clase active), oculto con JS al cambiar pestaña -->
+    <div class="auth-panel active" id="panel-login" role="tabpanel" aria-labelledby="tab-login-btn">
+
+      <!-- Email -->
+      <!-- Contenedor relativo del campo email: necesario para posicionar el ícono 📧 de forma absoluta -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 📧 decorativo posicionado absolutamente a la izquierda del campo email -->
+        <span class="auth-field-icon">📧</span>
+        <!-- Input de email para login: type=email activa teclado con @ en móvil, valida formato -->
+        <input class="auth-input" id="login-email" type="email"
+          placeholder="Correo electrónico"
+          autocomplete="email" inputmode="email"
+          oninput="authClearError('login-email')"
+          onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+        <!-- Área de mensaje de error específico del email: oculta hasta que authFieldError() la activa -->
+        <div class="auth-field-error" id="login-email-err"></div>
+      </div>
+
+      <!-- Password -->
+      <!-- Contenedor relativo del campo contraseña: posiciona el ícono 🔒 y el botón ojo internamente -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 🔒 decorativo posicionado absolutamente a la izquierda del campo contraseña -->
+        <span class="auth-field-icon">🔒</span>
+        <!-- Input de contraseña: type=password oculta caracteres | autocomplete=current-password activa gestor de contraseñas -->
+        <input class="auth-input" id="login-pass" type="password"
+          placeholder="Contraseña"
+          autocomplete="current-password"
+          oninput="authClearError('login-pass')"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="auth-pw-toggle" type="button"
+          onclick="authTogglePw('login-pass',this)" aria-label="Mostrar/ocultar contraseña">👁️</button>
+        <!-- Área de error del campo contraseña (ej: "Ingresa tu contraseña") -->
+        <div class="auth-field-error" id="login-pass-err"></div>
+      </div>
+
+      <!-- Forgot -->
+      <div style="text-align:right;margin-top:-.3rem">
+        <!-- Botón "¿Olvidaste tu contraseña?": estilizado inline para no parecer enlace estándar -->
+        <button onclick="authForgotPassword()" style="background:none;border:none;cursor:pointer;font-family:inherit;font-size:.75rem;font-weight:800;color:var(--blue)">¿Olvidaste tu contraseña?</button>
+      </div>
+
+      <!-- CTA -->
+      <!-- Botón principal "Entrar": llama doLogin(), muestra spinner durante autenticación con clase .loading -->
+      <button class="auth-cta" id="login-cta" onclick="doLogin()">
+        <!-- Texto visible del botón; se oculta con opacity:0 al activar .loading para mostrar el spinner -->
+        <span class="auth-cta-text">Entrar</span>
+        <!-- Spinner ⏳ de carga: aparece con display:flex al agregar clase .loading al botón CTA -->
+        <span class="auth-cta-spinner">⏳</span>
+      </button>
+
+      <!-- Divisor visual "o continúa como": dos líneas horizontales con texto central -->
+      <div class="auth-divider"><span>o continúa como</span></div>
+
+      <!-- Botón de acceso como invitado: permite entrar sin cuenta, el progreso NO se guarda -->
+      <button class="auth-guest-btn" onclick="doGuestLogin()">
+        👤 Modo invitado (sin guardar progreso)
+      </button>
+
+      <!-- Texto de términos legales con enlaces clickeables a documentos de privacidad y uso -->
+      <div class="auth-terms">
+        Al continuar aceptas nuestros
+        <a href="#" onclick="return false">Términos de uso</a> y
+        <a href="#" onclick="return false">Política de privacidad</a>
+      </div>
+    </div>
+
+    <!-- ── REGISTER PANEL ── -->
+    <!-- Panel del formulario de REGISTRO: oculto por defecto, aparece al seleccionar la pestaña -->
+    <div class="auth-panel" id="panel-register" role="tabpanel" aria-labelledby="tab-register-btn">
+
+      <!-- Name -->
+      <!-- Contenedor relativo de campo de formulario: permite posicionar íconos absolutamente dentro -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 👤 decorativo a la izquierda del campo nombre de usuario -->
+        <span class="auth-field-icon">👤</span>
+        <!-- Input nombre de usuario: maxlength=24 limita longitud, autocomplete=username para autocompletar -->
+        <input class="auth-input" id="reg-name" type="text"
+          placeholder="Nombre de usuario"
+          maxlength="24" autocomplete="username"
+          oninput="authClearError('reg-name')"
+          onkeydown="if(event.key==='Enter')document.getElementById('reg-email').focus()">
+        <!-- Mensaje de error del campo nombre (ej: "Mínimo 2 caracteres") -->
+        <div class="auth-field-error" id="reg-name-err"></div>
+      </div>
+
+      <!-- Email -->
+      <!-- Contenedor relativo del campo email: necesario para posicionar el ícono 📧 de forma absoluta -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 📧 decorativo posicionado absolutamente a la izquierda del campo email -->
+        <span class="auth-field-icon">📧</span>
+        <!-- Input email de registro: valida formato con type=email, inputmode optimiza teclado móvil -->
+        <input class="auth-input" id="reg-email" type="email"
+          placeholder="Correo electrónico"
+          autocomplete="email" inputmode="email"
+          oninput="authClearError('reg-email')"
+          onkeydown="if(event.key==='Enter')document.getElementById('reg-pass').focus()">
+        <!-- Mensaje de error del campo email de registro -->
+        <div class="auth-field-error" id="reg-email-err"></div>
+      </div>
+
+      <!-- Password -->
+      <!-- Contenedor relativo del campo contraseña: posiciona el ícono 🔒 y el botón ojo internamente -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 🔒 decorativo posicionado absolutamente a la izquierda del campo contraseña -->
+        <span class="auth-field-icon">🔒</span>
+        <!-- Input contraseña de registro: oninput llama authCheckStrength() para mostrar la barra de fortaleza en tiempo real -->
+        <input class="auth-input" id="reg-pass" type="password"
+          placeholder="Contraseña (mín. 8 caracteres)"
+          autocomplete="new-password"
+          oninput="authCheckStrength(this.value);authClearError('reg-pass')"
+          onkeydown="if(event.key==='Enter')document.getElementById('reg-pass2').focus()">
+        <button class="auth-pw-toggle" type="button"
+          onclick="authTogglePw('reg-pass',this)" aria-label="Mostrar/ocultar contraseña">👁️</button>
+        <!-- Mensaje de error de contraseña (ej: "Mínimo 8 caracteres") -->
+        <div class="auth-field-error" id="reg-pass-err"></div>
+        <!-- Strength bar -->
+        <!-- Contenedor de la barra de fortaleza de contraseña: oculto hasta que el usuario empieza a escribir -->
+        <div class="auth-pw-strength" id="pw-strength-wrap">
+          <!-- Barra visual de fortaleza: el JS ajusta su width% y color dinámicamente (rojo→naranja→amarillo→verde) -->
+          <div class="auth-pw-bar"><div class="auth-pw-fill" id="pw-strength-bar"></div></div>
+          <!-- Etiqueta textual de fortaleza: "Muy débil 🔴", "Regular 🟡", "Excelente 💚", actualizada por authCheckStrength() -->
+          <div class="auth-pw-label" id="pw-strength-label"></div>
+        </div>
+      </div>
+
+      <!-- Confirm Password -->
+      <!-- Contenedor relativo del campo contraseña: posiciona el ícono 🔒 y el botón ojo internamente -->
+      <div class="auth-field-wrap">
+        <!-- Ícono 🔒 decorativo posicionado absolutamente a la izquierda del campo contraseña -->
+        <span class="auth-field-icon">🔒</span>
+        <!-- Input de confirmación de contraseña: Enter ejecuta doRegister() directamente -->
+        <input class="auth-input" id="reg-pass2" type="password"
+          placeholder="Confirmar contraseña"
+          autocomplete="new-password"
+          oninput="authClearError('reg-pass2')"
+          onkeydown="if(event.key==='Enter')doRegister()">
+        <button class="auth-pw-toggle" type="button"
+          onclick="authTogglePw('reg-pass2',this)" aria-label="Mostrar/ocultar contraseña">👁️</button>
+        <!-- Mensaje de error si las contraseñas no coinciden -->
+        <div class="auth-field-error" id="reg-pass2-err"></div>
+      </div>
+
+      <!-- Avatar picker -->
+      <div>
+        <!-- Etiqueta "Elige tu avatar" encima del selector de emojis -->
+        <div class="auth-avatar-label">Elige tu avatar</div>
+        <!-- Grid vacío que el JS puebla con 20 botones de avatar emoji en authInit() -->
+        <div class="auth-avatar-grid" id="auth-avatar-grid"></div>
+      </div>
+
+      <!-- Terms checkbox -->
+      <div class="auth-check-row">
+        <!-- Checkbox de términos y condiciones: requerido para poder crear cuenta -->
+        <input type="checkbox" id="reg-terms" onclick="authClearError('reg-terms')">
+        <!-- Etiqueta clickeable del checkbox con enlaces a los documentos legales -->
+        <label class="auth-check-label" for="reg-terms">
+          Acepto los <a href="#" onclick="return false" style="color:var(--blue)">Términos de uso</a>
+          y la <a href="#" onclick="return false" style="color:var(--blue)">Política de privacidad</a>
+        </label>
+      </div>
+      <!-- Error si intenta registrarse sin aceptar términos: "Debes aceptar los términos..." -->
+      <div class="auth-field-error" id="reg-terms-err"></div>
+
+      <!-- CTA -->
+      <!-- Botón "Crear cuenta": llama doRegister(), con estado loading igual que el botón de login -->
+      <button class="auth-cta" id="reg-cta" onclick="doRegister()">
+        <!-- Texto del botón de registro, oculto durante el spinner de creación de cuenta -->
+        <span class="auth-cta-text">Crear cuenta</span>
+        <!-- Spinner ⏳ de carga: aparece con display:flex al agregar clase .loading al botón CTA -->
+        <span class="auth-cta-spinner">⏳</span>
+      </button>
+
+      <!-- Divisor visual "o continúa como": dos líneas horizontales con texto central -->
+      <div class="auth-divider"><span>o continúa como</span></div>
+
+      <!-- Botón de acceso como invitado: permite entrar sin cuenta, el progreso NO se guarda -->
+      <button class="auth-guest-btn" onclick="doGuestLogin()">
+        👤 Modo invitado (sin guardar progreso)
+      </button>
+    </div>
+
+  </div>
+</div>
+<!-- ██ END AUTH SCREEN ██ -->
+
+
+
+<!-- TOP BAR -->
+<!-- Barra superior fija (sticky): siempre visible al hacer scroll, z-index 200 -->
+<div id="topbar">
+  <!-- Logo safeXP con gradiente de texto azul-morado y emoji búho 🦉 -->
+  <div class="logo"><svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+  <defs>
+    <linearGradient id="tg1" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1cb0f6"/>
+      <stop offset="100%" stop-color="#9c27ff"/>
+    </linearGradient>
+  </defs>
+  <!-- outer cube -->
+  <rect x="2" y="2" width="18" height="18" rx="2" fill="none" stroke="url(#tg1)" stroke-width="2"/>
+  <!-- inner cube -->
+  <rect x="8" y="8" width="18" height="18" rx="2" fill="none" stroke="url(#tg1)" stroke-width="2" opacity=".7"/>
+  <!-- connectors -->
+  <line x1="2" y1="2" x2="8" y2="8" stroke="url(#tg1)" stroke-width="1.5" opacity=".8"/>
+  <line x1="20" y1="2" x2="26" y2="8" stroke="url(#tg1)" stroke-width="1.5" opacity=".8"/>
+  <line x1="2" y1="20" x2="8" y2="26" stroke="url(#tg1)" stroke-width="1.5" opacity=".8"/>
+  <line x1="20" y1="20" x2="26" y2="26" stroke="url(#tg1)" stroke-width="1.5" opacity=".8"/>
+</svg><span style="margin-left:.2rem">safeXP</span></div>
+  <!-- Zona derecha del topbar: stats de fuego/gemas/XP, corazones y botón de desarrollador -->
+  <div class="topbar-right">
+    <button id="a11y-open-btn" onclick="openA11yPanel()" aria-label="Abrir panel de accesibilidad. Atajo: tecla A" title="Accesibilidad (A)">♿</button>
+    <!-- Botón 🛠️ desarrollador: abre el panel de ajustes avanzados con openDevAuth() -->
+    <button id="dev-btn" onclick="openDevAuth()" title="Modo Desarrollador" aria-label="Modo Desarrollador">🛠️</button>
+    <span id="dev-indicator">DEV</span>
+    <!-- Pastilla de racha 🔥: muestra días consecutivos en naranja -->
+    <div class="tb-stat fire" role="status" aria-label="Racha de días"><span id="tb-streak-icon">🔥</span> <span id="tb-streak">0</span></div>
+    <!-- Pastilla de gemas 💎: moneda del juego, mostrada en azul -->
+    <div class="tb-stat gem" role="status" aria-label="Gemas"><span id="tb-gems-icon">💎</span> <span id="tb-gems">0</span></div>
+    <!-- Pastilla de XP ⭐: puntos de experiencia acumulados, mostrados en verde -->
+    <div class="tb-stat xpp" role="status" aria-label="Puntos de experiencia"><span id="tb-xp-icon">⚡</span> <span id="tb-xp">0</span></div>
+    <div class="tb-stat" id="hearts-stat" style="border-color:var(--red)">
+      <div class="hearts-row" id="hearts-row"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ HOME ██ -->
+<main id="main-content">
+<!-- Pantalla HOME: mapa de unidades de aprendizaje, pantalla principal del juego -->
+<div class="screen active" id="home" tabindex="-1">
+  <nav id="left-nav">
+    <button class="nav-icon-btn active" id="nav-map" title="Inicio" onclick="showTab('map')">🗺️<span class="nav-lbl">Inicio</span></button>
+    <button class="nav-icon-btn" id="nav-profile" title="Perfil" onclick="showTab('profile')">👤<span class="nav-lbl">Perfil</span></button>
+    <button class="nav-icon-btn" id="nav-friends" title="Amigos" onclick="showTab('friends')">👥<span class="nav-lbl">Amigos</span></button>
+    <button class="nav-icon-btn" id="nav-competitive" title="Competitivo" onclick="showTab('competitive')">⚔️<span class="nav-lbl">Duelos</span></button>
+    <button class="nav-icon-btn" id="nav-ranking" title="Ranking" onclick="showTab('ranking')">🏆<span class="nav-lbl">Ranking</span></button>
+    <button class="nav-icon-btn" id="nav-achievements" title="Logros" onclick="showTab('achievements')">🎖️<span class="nav-lbl">Logros</span></button>
+  </nav>
+  <div id="map-area"></div>
+  <!-- Panel deslizable que lista las actividades de una unidad al tocarla en el mapa -->
+  <div id="unit-detail"></div>
+  <!-- TAB: PROFILE -->
+  <div id="tab-profile" style="display:none;flex:1;overflow-y:auto"></div>
+  <!-- TAB: FRIENDS -->
+  <div id="tab-friends" style="display:none;flex:1;overflow-y:auto"></div>
+  <!-- TAB: COMPETITIVE -->
+  <div id="tab-competitive" style="display:none;flex:1;overflow-y:auto"></div>
+  <!-- TAB: RANKING -->
+  <div id="tab-ranking" style="display:none;flex:1;overflow-y:auto"></div>
+  <!-- TAB: ACHIEVEMENTS -->
+  <div id="tab-achievements" style="display:none;flex:1;overflow-y:auto"></div>
+</div>
+
+<!-- ██ PLACEMENT TEST ██ -->
+<!-- Overlay del test de nivel inicial: 5 preguntas que determinan el punto de entrada del usuario -->
+<div id="placement-overlay">
+  <div class="placement-card">
+    <div class="placement-header">
+      <div style="font-size:2.5rem;margin-bottom:.5rem">🎯</div>
+      <h2>Prueba de Posicionamiento</h2>
+      <p>Respondes 5 preguntas y te ubicamos en el nivel correcto</p>
+    </div>
+    <div class="placement-body">
+      <div class="placement-progress" id="placement-pips"></div>
+      <div id="placement-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ DAILY CHALLENGE ██ -->
+<!-- Overlay del reto diario: pregunta especial con recompensa de XP extra -->
+<div id="daily-overlay" onclick="if(event.target===this)closeDailyChallenge()">
+  <div class="daily-card" style="position:relative">
+      <button onclick="closeDailyChallenge()" style="position:absolute;top:.8rem;right:.8rem;z-index:10;background:rgba(255,255,255,.25);border:none;border-radius:50%;width:32px;height:32px;font-size:1.1rem;cursor:pointer;color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center">✕</button>
+    <div class="daily-header">
+      <span class="dh-emoji" id="daily-emoji">🎯</span>
+      <h2 id="daily-title">Reto del día</h2>
+      <p id="daily-subtitle">¡Complétalo y gana XP extra!</p>
+    </div>
+    <div class="daily-body" id="daily-body"></div>
+  </div>
+</div>
+
+<!-- ██ LESSON ██ -->
+<!-- Pantalla LESSON: donde el usuario responde preguntas; contiene barra de progreso y botón 📖 Teoría -->
+<div class="screen" id="lesson" role="region" aria-label="Lección activa">
+  <div class="lesson-shell">
+    <!-- Barra superior de la lección: botón cerrar, barra de progreso, botón 📖 Teoría y corazones -->
+    <div class="les-top">
+      <button class="les-close" onclick="confirmClose()" aria-label="Salir de la lección" title="Salir de la lección (tecla Escape)" style="font-size:1.4rem;line-height:1;padding:.35rem .45rem;min-width:38px;min-height:38px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--rsf);border:2px solid var(--border);color:var(--rd);cursor:pointer;font-family:inherit;font-weight:900">✕</button>
+      <!-- Contenedor de la barra de progreso de la lección con atributos ARIA para accesibilidad -->
+      <div class="les-prog-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progreso de la lección" id="les-prog-bar-wrap"><div class="les-prog-fill" id="les-prog-fill" style="width:0%"></div></div>
+      <!-- Botón "📖 Teoría": abre el panel lateral con todas las preguntas y su fundamento teórico -->
+      <button id="theory-open-btn" onclick="openTheoryPanel()" title="Ver teoría y preguntas" aria-label="Abrir panel de teoría">📖 Teoría</button>
+      <!-- Contenedor de corazones ❤️: el JS los llena con íconos según las vidas restantes -->
+      <div class="les-hearts" id="les-hearts"></div>
+    </div>
+    <div id="q-area"></div>
+  </div>
+</div>
+
+<!-- ██ MINI-GAME ██ -->
+<!-- Pantalla MINIGAME: juego de pares "toca la descripción" para recuperar corazones perdidos -->
+<div class="screen" id="minigame">
+  <div class="mg-wrap" id="mg-wrap">
+    <!-- injected by JS -->
+  </div>
+</div>
+
+
+<!-- ██████ THEORY PANEL DRAWER ██████ -->
+<!-- Panel drawer lateral de TEORÍA: posición fija sobre la pantalla, inactivo hasta abrirse -->
+<div id="theory-panel" role="dialog" aria-modal="true" aria-label="Teoría y preguntas de la actividad">
+  <!-- Fondo oscuro semitransparente del panel: clic en él cierra el drawer llamando closeTheoryPanel() -->
+  <div id="theory-backdrop" onclick="closeTheoryPanel()"></div>
+  <!-- Cajón deslizante: width máx 420px, fondo blanco, se anima con translateX(100%)→0 al abrir -->
+  <div id="theory-drawer">
+    <!-- Encabezado sticky del drawer: ícono 📖, título de la actividad, contador de preguntas y botón ✕ -->
+    <div class="theory-header">
+      <!-- Ícono 📖 del encabezado del panel de teoría -->
+      <span class="theory-header-icon">📖</span>
+      <div>
+        <!-- Título principal del panel de teoría: muestra el nombre de la actividad activa -->
+        <div class="theory-header-title" id="theory-panel-title">Teoría y Preguntas</div>
+        <!-- Subtítulo del panel: descripción breve del propósito del drawer -->
+        <div class="theory-header-sub" id="theory-panel-sub">Revisa cada pregunta con su fundamento teórico</div>
+      </div>
+      <!-- Botón ✕ para cerrar el panel; aria-label lo hace accesible para lectores de pantalla -->
+      <button class="theory-close-btn" onclick="closeTheoryPanel()" aria-label="Cerrar panel de teoría">✕</button>
+    </div>
+    <!-- Banda de progreso debajo del header: barra animada + contador de preguntas respondidas -->
+    <div class="theory-progress-strip">
+      <!-- Barra de progreso: el JS ajusta su width en % al responder cada pregunta -->
+      <div class="theory-prog-bar"><div class="theory-prog-fill" id="theory-prog-fill" style="width:0%"></div></div>
+      <!-- Texto numérico: "3 / 10 respondidas", actualizado por _theoryUpdateProgress() -->
+      <div class="theory-prog-label" id="theory-prog-label">0 / 0</div>
+    </div>
+    <!-- Lista scrollable donde JS renderiza las tarjetas de cada pregunta con teoría y respuesta correcta -->
+    <div id="theory-list"></div>
+  </div>
+</div>
+<!-- ██ END THEORY PANEL ██ -->
+
+<!-- ██████ MESSAGES CONVERSATION PANEL ██████ -->
+<!-- Panel de conversación directa: pantalla completa que desliza desde la derecha al abrir un chat -->
+<div id="msg-conversation" role="dialog" aria-modal="true" aria-label="Conversación">
+  <!-- Encabezado del chat: botón volver ←, avatar, nombre, estado online y botón ⚔️ Retar -->
+  <div class="msg-conv-header">
+    <!-- Botón ← para cerrar la conversación y volver a la lista de mensajes -->
+    <button class="msg-conv-back" onclick="closeMsgConversation()" aria-label="Volver">←</button>
+    <!-- Avatar emoji del amigo en el encabezado; el JS lo actualiza al abrir cada conversación -->
+    <div class="msg-conv-av" id="msg-conv-av">🥷</div>
+    <div class="msg-conv-info">
+      <!-- Nombre del amigo con quien se chatea; actualizado por openMsgConversation() -->
+      <div class="msg-conv-name" id="msg-conv-name">—</div>
+      <!-- Estado: "🟢 En línea ahora" o "⚫ Desconectado · hace X"; actualizado dinámicamente -->
+      <div class="msg-conv-status" id="msg-conv-status">—</div>
+    </div>
+    <!-- Botón ⚔️ Retar: visible solo cuando el amigo está en línea; llama msgStartDuel() -->
+    <button class="msg-conv-duel" id="msg-conv-duel-btn" onclick="msgStartDuel()">⚔️ Retar</button>
+  </div>
+  <!-- Contenedor scrollable de burbujas de chat; el JS las renderiza con _renderMsgBubbles() -->
+  <div class="msg-bubbles" id="msg-bubbles"></div>
+  <!-- Barra de input inferior del chat: botón adjuntar 📊, campo de texto y botón enviar -->
+  <div class="msg-input-bar">
+    <!-- Botón 📊: llama msgShareProgress() para enviar la tarjeta de progreso en el chat -->
+    <button class="msg-attach-btn" onclick="msgShareProgress()" title="Compartir progreso">📊</button>
+    <!-- Campo de texto del mensaje: Enter envía, maxlength=300 caracteres -->
+    <input class="msg-input" id="msg-input" placeholder="Escribe un mensaje…"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+      maxlength="300">
+    <!-- Botón enviar ➤: llama sendMessage() que agrega el mensaje y simula respuesta si el amigo está online -->
+    <button class="msg-send-btn" onclick="sendMessage()" aria-label="Enviar">➤</button>
+  </div>
+</div>
+
+<!-- ██████ SHARE PROGRESS MODAL ██████ -->
+<!-- Modal de compartir progreso: bottom-sheet que sube desde abajo al abrirse -->
+<div id="share-progress-modal">
+  <!-- Fondo oscuro del modal: clic en él cierra el bottom-sheet -->
+  <div class="spm-backdrop" onclick="closeShareProgressModal()"></div>
+  <!-- Hoja del modal: fondo blanco, bordes redondeados arriba, altura máx 88vh con scroll -->
+  <div class="spm-sheet">
+    <!-- Asa visual del bottom-sheet: línea gris corta que indica que se puede deslizar para cerrar -->
+    <div class="spm-handle"></div>
+    <!-- Título "📊 Compartir mi progreso" del modal -->
+    <div class="spm-title">📊 Compartir mi progreso</div>
+    <!-- Subtítulo explicativo del modal -->
+    <div class="spm-sub">Genera una tarjeta con tus stats y compártela</div>
+    <!-- Preview card -->
+    <!-- Contenedor donde JS renderiza la tarjeta visual de progreso con XP, racha y módulos -->
+    <div class="spm-preview" id="spm-preview" style="background:var(--grad-social);border:1px solid var(--grad-social-border)"></div>
+    <!-- Caption -->
+    <!-- Área de texto para que el usuario añada un mensaje personalizado al compartir -->
+    <textarea class="spm-caption-input" id="spm-caption"
+      placeholder="Añade un mensaje… (ej: ¡Acabo de completar el módulo de phishing! 🎉)"></textarea>
+    <!-- Share options -->
+    <div class="spm-share-options" style="margin-top:.8rem">
+      <div class="spm-share-row">
+        <!-- Botón WhatsApp: abre wa.me con el texto del progreso codificado en URL -->
+        <button class="spm-share-btn whatsapp" onclick="doShareProgress('whatsapp')">💬 WhatsApp</button>
+        <!-- Botón Twitter/X: abre twitter.com/intent/tweet con el resumen del progreso -->
+        <button class="spm-share-btn twitter"  onclick="doShareProgress('twitter')">🐦 Twitter/X</button>
+      </div>
+      <div class="spm-share-row">
+        <!-- Botón "En el Feed": publica el progreso en el feed social del juego -->
+        <button class="spm-share-btn friends"  onclick="doShareProgress('friends')">👥 En el Feed</button>
+        <!-- Botón copiar: copia el texto de progreso al portapapeles con navigator.clipboard -->
+        <button class="spm-share-btn copy"     onclick="doShareProgress('copy')">📋 Copiar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ██ END SOCIAL PANELS ██ -->
+
+
+<!-- ██ RESULT ██ -->
+<!-- Pantalla RESULT: resumen post-actividad con XP ganado, corazones usados y badges desbloqueados -->
+<div class="screen" id="result">
+  <span class="res-fireworks" id="res-emoji">🏆</span>
+  <div class="res-title" id="res-title">¡Completado!</div>
+  <div class="res-sub" id="res-sub"></div>
+  <div class="res-cards">
+    <div class="res-card"><div class="rc-val" style="color:var(--yellow)" id="rc-xp">0</div><div class="rc-lbl">XP</div></div>
+    <div class="res-card"><div class="rc-val" style="color:var(--green)" id="rc-acc">0%</div><div class="rc-lbl">Precisión</div></div>
+    <div class="res-card"><div class="rc-val" style="color:var(--orange)" id="rc-streak">0</div><div class="rc-lbl">Racha</div></div>
+    <div class="res-card"><div class="rc-val" style="color:var(--blue)" id="rc-time">0s</div><div class="rc-lbl">Tiempo</div></div>
+  </div>
+  <button class="home-btn" onclick="goHome()">Seguir aprendiendo →</button>
+</div>
+
+<!-- FEEDBACK BAR -->
+<!-- Barra de feedback inferior: aparece tras responder, muestra si fue correcto/incorrecto y explicación -->
+<div id="fb-bar">
+  <div class="fb-left">
+    <div class="fb-big-icon" id="fb-icon">✅</div>
+    <div>
+      <div class="fb-title" id="fb-title">¡Excelente!</div>
+      <div class="fb-explain" id="fb-explain"></div>
+    </div>
+  </div>
+  <button class="fb-cont-btn ok-cont" id="fb-btn" tabindex="0" onclick="nextQ()" aria-label="Continuar a la siguiente pregunta">CONTINUAR</button>
+</div>
+
+<!-- NO HEARTS OVERLAY -->
+<!-- Overlay que bloquea el juego al quedarse sin corazones, con opciones para recuperarlos -->
+<div id="no-hearts-overlay">
+  <div class="nh-modal">
+    <span class="nh-icon">💔</span>
+    <div class="nh-title">¡Sin vidas!</div>
+    <div class="nh-sub">Perdiste todas tus vidas. Juega el mini-juego para recuperarlas y seguir aprendiendo.</div>
+    <button class="nh-btn primary" onclick="goMinigame()">🎮 Jugar para recuperar vidas</button>
+    <button class="nh-btn secondary" onclick="hideNoHearts()">Volver al inicio</button>
+  </div>
+</div>
+
+</main>
+<div id="toast"></div>
+
+<!-- EXIT CONFIRM -->
+<div id="exit-confirm-overlay">
+  <div class="exit-modal">
+    <span class="em-icon">🐺</span>
+    <div class="em-title">¿Seguro que quieres salir?</div>
+    <div class="em-sub">Shadow se quedará solo... Perderás el progreso de esta actividad.</div>
+    <div class="em-btns">
+      <button class="em-stay" onclick="document.getElementById('exit-confirm-overlay').classList.remove('show')">¡Me quedo! 💪</button>
+      <button class="em-exit" onclick="document.getElementById('exit-confirm-overlay').classList.remove('show');goHome()">Salir de todas formas</button>
+    </div>
+  </div>
+</div>
+
+<!-- LESSON INFO OVERLAY (intro / halfway / end) -->
+<!-- Overlay de intro/cierre de lección: aparece antes y después de cada actividad -->
+<div id="lesson-info-overlay">
+  <div class="li-modal" id="li-modal-inner"><!-- injected by JS --></div>
+</div>
+
+
+<div id="mascot-bubble">
+  <div id="mascot-speech" class="hidden">
+    <span class="speech-close" onclick="hideSpeech()">x</span>
+    <span id="speech-text">¡Hola! Soy Shadow 🐺 tu guia de ciberseguridad!</span>
+  </div>
+  <div id="mascot-owl" onclick="toggleSpeech()" title="Shadow">🐺</div>
+  <div class="mascot-name">Shadow</div>
+</div>
+<!-- Selector de minijuego: popup que permite elegir qué minijuego jugar para recuperar vidas -->
+<div id="mg-select-overlay">
+  <div class="mgs-modal">
+    <div style="font-size:2.5rem;margin-bottom:.4rem">🎮</div>
+    <div style="font-size:1.3rem;font-weight:900;margin-bottom:.3rem">Sin vidas! Elige un minijuego</div>
+    <div style="font-size:.83rem;color:var(--muted);margin-bottom:.5rem">Gana puntos para recuperar vidas</div>
+    <div class="mgs-grid">
+      <button class="mgs-btn" style="background:var(--gs);color:var(--gd)" onclick="launchGame('toca')">
+        <span class="mgs-icon">🛡</span>Toca lo Seguro
+      </button>
+      <button class="mgs-btn" style="background:var(--bs);color:var(--bd)" onclick="launchGame('trivia')">
+        <span class="mgs-icon">⚡</span>Trivia Rapida
+      </button>
+    </div>
+    <button style="background:none;border:2px solid var(--border);color:var(--muted);border-radius:12px;padding:.6rem 1.4rem;font-family:'Nunito',sans-serif;font-weight:800;cursor:pointer;font-size:.85rem" onclick="document.getElementById('mg-select-overlay').classList.remove('show');goHome()">Volver al inicio</button>
+  </div>
+</div>
+<!-- Pantalla MINIGAME2: trivia de velocidad como alternativa para recuperar corazones -->
+<div class="screen" id="minigame2">
+  <div class="mg2-wrap" id="mg2-wrap"></div>
+</div>
+
+
+<!-- Enlaza el archivo JavaScript principal con toda la lógica del juego -->
+<script src="app.js"></script>
+
+<!-- ♿ PANEL DE ACCESIBILIDAD -->
+<div id="a11y-panel-backdrop" onclick="closeA11yPanel()" aria-hidden="true"></div>
+<!-- Panel de accesibilidad: controles de tema, tamaño de fuente, movimiento y voz -->
+<aside id="a11y-panel" role="dialog" aria-modal="true" aria-label="Panel de accesibilidad" aria-hidden="true">
+  <div class="a11y-header">
+    <div>
+      <h2>Accesibilidad ♿</h2>
+      <p>Personaliza tu experiencia visual</p>
+    </div>
+    <button class="a11y-close" onclick="closeA11yPanel()" aria-label="Cerrar panel de accesibilidad">✕</button>
+  </div>
+  <div class="a11y-body">
+
+    <!-- TEMA DE COLOR -->
+    <div class="a11y-section">
+      <div class="a11y-section-title"><span>🎨</span> Paleta de colores</div>
+      <div class="theme-grid" role="radiogroup" aria-label="Seleccionar tema de color">
+        <button class="theme-btn active" id="theme-btn-light" onclick="setTheme('light')" role="radio" aria-checked="true" aria-label="Tema claro, predeterminado">
+          <div class="tb-preview">
+            <div class="tb-prev-bar" style="background:#f0f4f8"></div>
+            <div class="tb-prev-bar" style="background:#fff"></div>
+            <div class="tb-prev-bar" style="background:#58cc02"></div>
+            <div class="tb-prev-bar" style="background:#1cb0f6"></div>
+          </div>
+          <span>☀️ Claro</span>
+        </button>
+        <button class="theme-btn" id="theme-btn-dark" onclick="setTheme('dark')" role="radio" aria-checked="false" aria-label="Tema oscuro">
+          <div class="tb-preview">
+            <div class="tb-prev-bar" style="background:#12121c"></div>
+            <div class="tb-prev-bar" style="background:#1e1e2e"></div>
+            <div class="tb-prev-bar" style="background:#5ee009"></div>
+            <div class="tb-prev-bar" style="background:#38c2ff"></div>
+          </div>
+          <span>🌙 Oscuro</span>
+        </button>
+        <button class="theme-btn" id="theme-btn-hc-light" onclick="setTheme('hc-light')" role="radio" aria-checked="false" aria-label="Alto contraste claro, para baja visión">
+          <div class="tb-preview">
+            <div class="tb-prev-bar" style="background:#fff"></div>
+            <div class="tb-prev-bar" style="background:#000"></div>
+            <div class="tb-prev-bar" style="background:#005500"></div>
+            <div class="tb-prev-bar" style="background:#003399"></div>
+          </div>
+          <span>⚡ Alto contraste</span>
+        </button>
+        <button class="theme-btn" id="theme-btn-hc-dark" onclick="setTheme('hc-dark')" role="radio" aria-checked="false" aria-label="Alto contraste oscuro, para baja visión">
+          <div class="tb-preview">
+            <div class="tb-prev-bar" style="background:#000"></div>
+            <div class="tb-prev-bar" style="background:#0a0a0a"></div>
+            <div class="tb-prev-bar" style="background:#00ff55"></div>
+            <div class="tb-prev-bar" style="background:#55aaff"></div>
+          </div>
+          <span>🌑 HC Oscuro</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TAMAÑO DE TEXTO -->
+    <div class="a11y-section">
+      <div class="a11y-section-title"><span>🔤</span> Tamaño de texto</div>
+      <div class="font-row" role="radiogroup" aria-label="Tamaño de fuente">
+        <button class="font-btn active" id="font-btn-normal" onclick="setFont('normal')" role="radio" aria-checked="true" aria-label="Texto normal">A</button>
+        <button class="font-btn" id="font-btn-lg" onclick="setFont('lg')" role="radio" aria-checked="false" aria-label="Texto grande" style="font-size:1.05rem">A+</button>
+        <button class="font-btn" id="font-btn-xl" onclick="setFont('xl')" role="radio" aria-checked="false" aria-label="Texto muy grande" style="font-size:1.25rem">A++</button>
+        <button class="font-btn" id="font-btn-xxl" onclick="setFont('xxl')" role="radio" aria-checked="false" aria-label="Texto extra grande" style="font-size:1.45rem">A+++</button>
+      </div>
+    </div>
+
+    <!-- OPCIONES DE ASISTENCIA -->
+    <div class="a11y-section">
+      <div class="a11y-section-title"><span>🔊</span> Asistencia de lectura (TalkBack)</div>
+      <div class="a11y-toggle-row">
+        <label for="sw-narrator" style="flex:1;cursor:pointer">
+          <div class="a11y-toggle-label">🔊 Narrador (TalkBack)</div>
+          <div class="a11y-toggle-desc">Lee en voz alta cada pregunta, opciones y resultados — activar y cerrar el panel</div>
+        </label>
+        <label class="a11y-switch" aria-label="Activar lector de pantalla">
+          <input type="checkbox" id="sw-narrator" onchange="toggleNarrator(this.checked)" role="switch">
+          <div class="a11y-switch-track"></div>
+          <div class="a11y-switch-thumb"></div>
+        </label>
+      </div>
+      <div class="a11y-toggle-row">
+        <label for="sw-readexplain" style="flex:1;cursor:pointer">
+          <div class="a11y-toggle-label">📖 Leer explicaciones</div>
+          <div class="a11y-toggle-desc">Después de responder, el narrador lee la explicación completa</div>
+        </label>
+        <label class="a11y-switch" aria-label="Anunciar explicaciones">
+          <input type="checkbox" id="sw-readexplain" onchange="toggleReadExplain(this.checked)" role="switch">
+          <div class="a11y-switch-track"></div>
+          <div class="a11y-switch-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- NAVEGACIÓN CON TECLADO -->
+    <div class="a11y-section">
+      <div class="a11y-section-title"><span>⌨️</span> Navegación por teclado</div>
+      <div class="a11y-toggle-row">
+        <label for="sw-keynav" style="flex:1;cursor:pointer">
+          <div class="a11y-toggle-label">Modo teclado</div>
+          <div class="a11y-toggle-desc">Resalta el foco, permite navegar con Tab y responder con 1-4 o Enter</div>
+        </label>
+        <label class="a11y-switch" aria-label="Activar modo de teclado">
+          <input type="checkbox" id="sw-keynav" onchange="toggleKeyNav(this.checked)" role="switch">
+          <div class="a11y-switch-track"></div>
+          <div class="a11y-switch-thumb"></div>
+        </label>
+      </div>
+      <div id="key-shortcuts" style="display:none;background:var(--bg);border-radius:10px;padding:.7rem .9rem;font-size:.74rem;line-height:1.8;color:var(--text);margin-top:.3rem;border:1.5px solid var(--border)">
+        <strong>Atajos de teclado:</strong><br>
+        <kbd class="ks-key">Tab</kbd> Siguiente elemento<br>
+        <kbd class="ks-key">1</kbd><kbd class="ks-key">2</kbd><kbd class="ks-key">3</kbd><kbd class="ks-key">4</kbd> Seleccionar opción<br>
+        <kbd class="ks-key">V</kbd> Verdadero &nbsp; <kbd class="ks-key">F</kbd> Falso<br>
+        <kbd class="ks-key">Enter</kbd> Confirmar / Continuar<br>
+        <kbd class="ks-key">Esc</kbd> Salir de lección<br>
+        <kbd class="ks-key">R</kbd> Releer pregunta<br>
+        <kbd class="ks-key">A</kbd> Abrir accesibilidad
+      </div>
+    </div>
+
+    <!-- MOVIMIENTO -->
+    <div class="a11y-section">
+      <div class="a11y-section-title"><span>✨</span> Animaciones</div>
+      <div class="a11y-toggle-row">
+        <label for="sw-motion" style="flex:1;cursor:pointer">
+          <div class="a11y-toggle-label">Reducir animaciones</div>
+          <div class="a11y-toggle-desc">Desactiva efectos de movimiento (útil para sensibilidad visual)</div>
+        </label>
+        <label class="a11y-switch" aria-label="Reducir animaciones">
+          <input type="checkbox" id="sw-motion" onchange="toggleMotion(this.checked)" role="switch">
+          <div class="a11y-switch-track"></div>
+          <div class="a11y-switch-thumb"></div>
+        </label>
+      </div>
+    </div>
+
+    <!-- RESET -->
+    <button onclick="resetA11y()" style="width:100%;padding:.65rem;border-radius:10px;border:2px solid var(--border);background:var(--bg);color:var(--muted);font-family:inherit;font-weight:800;font-size:.82rem;cursor:pointer;margin-top:.3rem" aria-label="Restablecer configuración de accesibilidad">↺ Restablecer valores predeterminados</button>
+    <button onclick="testNarrator()" style="width:100%;padding:.65rem;border-radius:10px;border:2px solid var(--blue);background:var(--bs);color:var(--bd);font-family:inherit;font-weight:800;font-size:.82rem;cursor:pointer;margin-top:.4rem" aria-label="Probar narrador">🔊 Probar narrador ahora</button>
+
+  </div>
+</aside>
+
+
+<!-- ── QUIZ DE DESBLOQUEO ── -->
+<div id="unlock-overlay">
+  <div class="uq-modal" style="position:relative">
+    <button class="uq-close-btn" onclick="closeUnlockQuiz()" aria-label="Cerrar">✕</button>
+    <div class="uq-header">
+      <span class="uq-emoji" id="uq-emoji">🎯</span>
+      <div class="uq-title" id="uq-title">Quiz de Desbloqueo</div>
+      <div class="uq-sub" id="uq-sub">Responde correctamente para desbloquear esta sección</div>
+    </div>
+    <div class="uq-progress">
+      <div class="uq-prog-bar"><div class="uq-prog-fill" id="uq-prog-fill" style="width:0%"></div></div>
+      <div class="uq-prog-lbl" id="uq-prog-lbl">0 / 5</div>
+    </div>
+    <div id="uq-question-area">
+      <div class="uq-q" id="uq-q"></div>
+      <div class="uq-opts" id="uq-opts"></div>
+      <div class="uq-fb" id="uq-fb"></div>
+    </div>
+    <div class="uq-result" id="uq-result">
+      <span class="uq-result-icon" id="uq-result-icon">🎉</span>
+      <div class="uq-result-title" id="uq-result-title">¡Sección desbloqueada!</div>
+      <div class="uq-result-sub" id="uq-result-sub"></div>
+      <button class="uq-result-btn" id="uq-result-btn" onclick="closeUnlockQuiz()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════
+     DEV MODE: Auth overlay
+══════════════════════════════════════ -->
+<div id="dev-auth-overlay">
+  <div class="dev-auth-card">
+    <span class="dev-auth-icon">🛠️</span>
+    <div class="dev-auth-title">Modo Desarrollador</div>
+    <div class="dev-auth-sub">Ingresa la contraseña para acceder al panel de desarrollo</div>
+    <input id="dev-auth-input" class="dev-auth-input" type="password"
+      placeholder="••••••••" maxlength="32"
+      onkeydown="if(event.key==='Enter')devAuthSubmit();else devAuthClearError()"
+      autocomplete="off" spellcheck="false"/>
+    <div class="dev-auth-error" id="dev-auth-error">❌ Contraseña incorrecta</div>
+    <button class="dev-auth-btn" onclick="devAuthSubmit()">🔓 Acceder</button>
+    <button class="dev-auth-cancel" onclick="closeDevAuth()">Cancelar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     DEV MODE: Main panel
+══════════════════════════════════════ -->
+<!-- Panel de desarrollador: herramientas de debug, reset de datos y ajustes avanzados -->
+<div id="dev-panel">
+  <div class="dev-panel-inner">
+    <div class="dev-panel-header">
+      <div class="dev-panel-header-left">
+        <span class="dev-header-icon">🛠️</span>
+        <div>
+          <div class="dev-header-title">Panel de Desarrollador</div>
+          <div class="dev-header-sub" id="dev-header-sub">safeXP Dev Tools</div>
+        </div>
+      </div>
+      <button class="dev-panel-close" onclick="closeDevPanel()">✕</button>
+    </div>
+
+    <div class="dev-tabs">
+      <button class="dev-tab active" onclick="devShowTab('overview',event)">📊 Resumen</button>
+      <button class="dev-tab" onclick="devShowTab('units',event)">📚 Unidades</button>
+      <button class="dev-tab" onclick="devShowTab('answers',event)">✅ Respuestas</button>
+      <button class="dev-tab" onclick="devShowTab('state',event)">💾 Estado</button>
+    </div>
+
+    <!-- TAB: OVERVIEW -->
+    <div class="dev-tab-content active" id="dev-tab-overview">
+      <div class="dev-actions-grid">
+        <button class="dev-action-btn" onclick="devUnlockAll()">
+          <span class="dai">🔓</span>Desbloquear todo
+        </button>
+        <button class="dev-action-btn" onclick="devCompleteAll()">
+          <span class="dai">✅</span>Completar todo
+        </button>
+        <button class="dev-action-btn" onclick="devResetProgress()">
+          <span class="dai">🔄</span>Reiniciar progreso
+        </button>
+        <button class="dev-action-btn" onclick="devFillHearts()">
+          <span class="dai">❤️</span>Restaurar corazones
+        </button>
+      </div>
+      <div id="dev-stats-display" style="background:var(--bg);border-radius:12px;padding:.9rem 1rem;font-size:.8rem;line-height:1.9"></div>
+    </div>
+
+    <!-- TAB: UNITS -->
+    <div class="dev-tab-content" id="dev-tab-units">
+      <div id="dev-units-list"></div>
+    </div>
+
+    <!-- TAB: ANSWERS -->
+    <div class="dev-tab-content" id="dev-tab-answers">
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.9rem;font-weight:700">
+        📋 Todas las respuestas correctas de cada actividad y sus explicaciones.
+      </div>
+      <div id="dev-answers-list"></div>
+    </div>
+
+    <!-- TAB: STATE -->
+    <div class="dev-tab-content" id="dev-tab-state">
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:.6rem;font-weight:700">Estado actual del juego (localStorage)</div>
+      <div class="dev-state-pre" id="dev-state-pre"></div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap">
+        <button class="dev-action-btn" onclick="devCopyState()"><span class="dai">📋</span>Copiar JSON</button>
+        <button class="dev-action-btn danger" onclick="devClearStorage()"><span class="dai">🗑️</span>Limpiar localStorage</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cierre del cuerpo del documento -->
+</body>
+<!-- Cierre del elemento raíz HTML -->
+</html>
